@@ -1,3 +1,7 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: neikyl
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: serverless-todo-app
 service: serverless-todo-app
 
 plugins:
@@ -14,7 +18,8 @@ provider:
   environment:
     TODOS_TABLE: Todos-${self:provider.stage}
     TODOS_USER_INDEX: TodosUserIndex
-    IMAGES_S3_BUCKET: udacity-project-4-cloud-developer-${self:provider.stage}
+    # IMAGES_S3_BUCKET: udacity-project-4-cloud-developer-${self:provider.stage}
+    IMAGES_S3_BUCKET: udacity-project-4-cloud-developer
     SIGNED_URL_EXPIRATION: '300'
 
 functions:
