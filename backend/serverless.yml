@@ -1,142 +1,132 @@
 # "org" ensures this Service is used with the correct Serverless Framework Access Key.
 org: neikyl
 # "app" enables Serverless Framework Dashboard features and sharing them with other Services.
-app: serverless-todo-app
-service: serverless-todo-app
+app: todo-app
+service: todo-app-serverless
 
 plugins:
   - serverless-iam-roles-per-function
 
+
 provider:
   name: aws
-  runtime: nodejs18.x
-  apiGateway:
-    minimumCompressionSize: 1024
+  runtime: nodejs16.x
+  tracing:
+    lambda: true
+    apiGateway: true
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
-  tracing: true
   environment:
-    TODOS_TABLE: Todos-${self:provider.stage}
-    TODOS_USER_INDEX: TodosUserIndex
-    # IMAGES_S3_BUCKET: udacity-project-4-cloud-developer-${self:provider.stage}
-    IMAGES_S3_BUCKET: udacity-project-4-cloud-developer
-    SIGNED_URL_EXPIRATION: '300'
+    TODOS_TABLE: 01-Todo-${self:provider.stage}
+    TODOS_CREATED_AT_INDEX: CreatedAtIndex
+    TODO_ATTACHMENTS_S3_BUCKET: project-4-cloud-developer-${self:provider.stage}
+    SIGNED_URL_EXPIRATION: 300
+    AUTH0_CERTIFICATE: '-----BEGIN CERTIFICATE-----
+MIIDHTCCAgWgAwIBAgIJJXFjCdPwzc/VMA0GCSqGSIb3DQEBCwUAMCwxKjAoBgNV
+BAMTIWRldi0waXNsanA2eWZtNWdyaXIzLnVzLmF1dGgwLmNvbTAeFw0yNDA4MTEx
+MDQyMzBaFw0zODA0MjAxMDQyMzBaMCwxKjAoBgNVBAMTIWRldi0waXNsanA2eWZt
+NWdyaXIzLnVzLmF1dGgwLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
+ggEBAKOQbTzFbUSS0fsrWOTak0ZqgOHeWrjrqnxNlGV82u3KQOamutgKi9KamSQb
+YRzViGe6hecHvOQTNt5+rxtQLzmhLPVhV54unjLJtGdHkCmTdqVSYf5ZMMhxhNGq
+G59erWh0+jNGPUkV9PxHPwEuLGUWRWm25zChGf8WueBaDwkhcs1xRwZOKpIkmKtu
+ojtHtkQS514DFd8tk9AZwC7tpaYGaaLjtCjuiAbYjzRFQS+av3KmU+xZNrwEAmEY
+E4uA3Ol1PIzJLbvbSN7mGgfBGKBKLslqG1KY4kFUvIrIQcxwWZD6zeVJl0hYrFuK
+we3+7dgYRReYG27HdsCNoh6znPcCAwEAAaNCMEAwDwYDVR0TAQH/BAUwAwEB/zAd
+BgNVHQ4EFgQURXqDh5ydHdiB9DSBOsFZoRh7dQ8wDgYDVR0PAQH/BAQDAgKEMA0G
+CSqGSIb3DQEBCwUAA4IBAQCJ90CKRtZjr3Cf7Vzkub71xlsjS+3qtuZxN+81U0Og
+y+dzvO3mvTo8ohQXAlClVu8rHol88c+eAv0W19lmIvF3agHeRnySofVMqKFOMPyG
+qXt/N8saWKrXHg8Xrx+Arb0KneDLAh0DYuZz49pGkoCl49KCbGhBTEVT4+bTZTRo
+CwlMPz+hhL9Sl8rLRSk7qxBXPeTo3cB45rvSuzsVC6X/DdLtb1z8sre9HAelaDpy
+U3l6YSpuOd5y+bH0zTa/Suvt6XBZHFtIOqj5iuHhDjWARWWuOHcCu0BptR49LSjd
+1mJkXfsVt1/uMTuVjuptodX//M8MczJ7w/Vg15pjeiY8
+-----END CERTIFICATE-----'
 
 functions:
   Auth:
-    handler: src/lambda/auth/auth0Authorizer.handler
-    iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - "xray:PutTraceSegments"
-          - "xray:PutTelemetryRecords"
-        Resource:
-          - "*"
+    handler: src/lambda/auth/Auth0Authorizer.handler
 
-  CreateTodo:
-    handler: src/lambda/http/createTodo.handler
-    events:
-      - http:
-          method: post
-          path: todos
-          cors: true
-          authorizer: Auth
-          request:
-            schema:
-              application/json: ${file(src/schema/create-todo-request.json)}
-    iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - "xray:PutTraceSegments"
-          - "xray:PutTelemetryRecords"
-        Resource:
-          - "*"
-      - Effect: Allow
-        Action:
-          - dynamodb:PutItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
-
-  GetTodos:
+  getTodos:
     handler: src/lambda/http/getTodos.handler
     events:
       - http:
+          authorizer: Auth
           method: get
           path: todos
           cors: true
-          authorizer: Auth
     iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - "xray:PutTraceSegments"
-          - "xray:PutTelemetryRecords"
-        Resource:
-          - "*"
       - Effect: Allow
         Action:
           - dynamodb:Query
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+        Resource: !GetAtt TodosTable.Arn
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.TODOS_CREATED_AT_INDEX}
 
-  UpdateTodo:
+  createTodo:
+    handler: src/lambda/http/createTodo.handler
+    events:
+      - http:
+          authorizer: Auth
+          method: post
+          path: todos
+          cors: true
+          request:
+            schemas:
+              application/json: ${file(src/schemas/CreateTodoRequest.json)}
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource: !GetAtt TodosTable.Arn
+  updateTodo:
     handler: src/lambda/http/updateTodo.handler
     events:
       - http:
+          authorizer: Auth
           method: patch
           path: todos/{todoId}
           cors: true
-          authorizer: Auth
           request:
-            schema:
-              application/json: ${file(src/schema/update-todo-request.json)}
+            schemas:
+              application/json: ${file(src/schemas/UpdateTodoRequest.json)}
     iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - "xray:PutTraceSegments"
-          - "xray:PutTelemetryRecords"
-        Resource:
-          - "*"
       - Effect: Allow
         Action:
           - dynamodb:UpdateItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+        Resource: !GetAtt TodosTable.Arn
 
-  DeleteTodo:
+  deleteTodo:
     handler: src/lambda/http/deleteTodo.handler
     events:
       - http:
+          authorizer: Auth
           method: delete
           path: todos/{todoId}
           cors: true
-          authorizer: Auth
     iamRoleStatements:
-      - Effect: "Allow"
-        Action:
-          - "xray:PutTraceSegments"
-          - "xray:PutTelemetryRecords"
-        Resource:
-          - "*"
       - Effect: Allow
         Action:
           - dynamodb:DeleteItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+        Resource: !GetAtt TodosTable.Arn
 
-  GenerateUploadUrl:
+  generateUploadUrl:
     handler: src/lambda/http/generateUploadUrl.handler
     events:
       - http:
+          authorizer: Auth
           method: post
           path: todos/{todoId}/attachment
           cors: true
-          authorizer: Auth
     iamRoleStatements:
       - Effect: Allow
         Action:
-          - s3:PutObject
-          - s3:GetObject
-        Resource: arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*
+          - dynamodb:UpdateItem
+        Resource: !GetAtt TodosTable.Arn
       - Effect: Allow
         Action:
-          - dynamodb:UpdateItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+          - s3:PutObject
+        Resource: arn:aws:s3:::${self:provider.environment.TODO_ATTACHMENTS_S3_BUCKET}/*
 
 resources:
   Resources:
@@ -146,11 +136,10 @@ resources:
         ResponseParameters:
           gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
           gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-          gatewayresponse.header.Access-Control-Allow-Methods: "'OPTIONS,GET,POST,PUT,DELETE'"
+          gatewayresponse.header.Access-Control-Allow-Methods: "'GET,OPTIONS,POST'"
         ResponseType: DEFAULT_4XX
         RestApiId:
           Ref: ApiGatewayRestApi
-
     TodosTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -159,7 +148,7 @@ resources:
             AttributeType: S
           - AttributeName: todoId
             AttributeType: S
-          - AttributeName: dueDate
+          - AttributeName: createdAt
             AttributeType: S
         KeySchema:
           - AttributeName: userId
@@ -169,28 +158,25 @@ resources:
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.TODOS_TABLE}
         LocalSecondaryIndexes:
-          - IndexName: ${self:provider.environment.TODOS_USER_INDEX}
+          - IndexName: ${self:provider.environment.TODOS_CREATED_AT_INDEX}
             KeySchema:
               - AttributeName: userId
                 KeyType: HASH
-              - AttributeName: dueDate
+              - AttributeName: createdAt
                 KeyType: RANGE
             Projection:
-              ProjectionType: ALL
+              ProjectionType: ALL 
 
-    ImageBucket:
+    AttachmentsBucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: ${self:provider.environment.IMAGES_S3_BUCKET}
+        BucketName: ${self:provider.environment.TODO_ATTACHMENTS_S3_BUCKET}
         PublicAccessBlockConfiguration:
-          BlockPublicAcls: false
           BlockPublicPolicy: false
-          IgnorePublicAcls: false
           RestrictPublicBuckets: false
         CorsConfiguration:
           CorsRules:
-            -
-              AllowedOrigins:
+            - AllowedOrigins:
                 - '*'
               AllowedHeaders:
                 - '*'
@@ -205,13 +191,13 @@ resources:
     BucketPolicy:
       Type: AWS::S3::BucketPolicy
       Properties:
-        Bucket: ${self:provider.environment.IMAGES_S3_BUCKET}
         PolicyDocument:
-          Id: project-4
+          Id: TodoAttachmentBucketPolicy
           Version: "2012-10-17"
           Statement:
             - Sid: PublicReadForGetBucketObjects
               Effect: Allow
               Principal: '*'
               Action: 's3:GetObject'
-              Resource: 'arn:aws:s3:::${self:provider.environment.IMAGES_S3_BUCKET}/*'
+              Resource: arn:aws:s3:::${self:provider.environment.TODO_ATTACHMENTS_S3_BUCKET}/*
+        Bucket: !Ref AttachmentsBucket

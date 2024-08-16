@@ -1,29 +1,27 @@
-import { getTodos } from "../../businessLogic/todos.mjs"
-import { createLogger } from '../../utils/logger.mjs'
+import cors from '@middy/http-cors'
+import middy from '@middy/core'
+import { createLogInfo } from '../../log-info/LogUtils.mjs'
+import httpErrorHandler from '@middy/http-error-handler'
+import { getTodoLogic } from '../../business-logic/todosLogic.js'
 
-const logger = createLogger('getToDo')
+const log = createLogInfo('Event: Get todos')
 
-export async function handler(event) {
-  // TODO: Get all TODO items for a current user
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Credentials': true
-  };
+export const handler = middy()
+    .use(httpErrorHandler())
+    .use(
+        cors({
+            credentials: true
+        })
+    )
+    .handler(async (ev) => {
+        console.log('Event: ', ev)
 
-  try {
-    const items = await getTodos(event);
-    logger.info('Successfully get ToDos');
-    return {
-      statusCode: 201,
-      headers,
-      body: JSON.stringify({ items })
-    };
-  } catch (error) {
-    logger.error(`Error: ${error.message}`);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error })
-    };
-  }
-}
+        const todoList = await getTodoLogic(ev);
+        log.info('Generated url successfully!', todoList)
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                items: todoList
+            })
+        }
+    })

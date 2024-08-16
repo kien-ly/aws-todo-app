@@ -1,31 +1,28 @@
-import {generateUploadUrl} from "../../businessLogic/todos.mjs"
-import { createLogger } from '../../utils/logger.mjs'
+import cors from "@middy/http-cors";
+import middy from "@middy/core";
+import httpErrorHandler from "@middy/http-error-handler";
+import { createLogInfo } from '../../log-info/LogUtils.mjs'
+import { addAttachMentLogic } from "../../business-logic/todosLogic.js";
 
-const logger = createLogger('generateUpdateUrl')
+const log = createLogInfo('Event: Generate URL')
 
-export async function handler(event) {
-  const todoId = event.pathParameters.todoId
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Credentials': true
-  };
-
-  
-  try {
-    const signedUrl = await generateUploadUrl(event, todoId);
-    logger.info('Successfully created signed url.');
-    return {
-      statusCode: 201,
-      headers,
-      body: JSON.stringify({ uploadUrl: signedUrl })
-    };
-  } catch (error) {
-    logger.error(`Error: ${error.message}`);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error })
-    };
-  }
-}
-
+export const handler = middy()
+    .use(httpErrorHandler())
+    .use(
+        cors({
+            credentials: true
+        })
+    )
+    .handler(async (ev) => {
+        console.log('Event: ', ev);
+        const urlAtc = await addAttachMentLogic(ev);
+        log.info('Generated url successfully!', {
+            uploadUrl: urlAtc
+        })
+        return {
+            statusCode: 200,
+            body: JSON.stringify({
+                uploadUrl: urlAtc
+            })
+        }
+    })

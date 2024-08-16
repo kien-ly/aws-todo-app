@@ -1,29 +1,26 @@
-import {deleteTodo} from "../../businessLogic/todos.mjs"
-import { createLogger } from '../../utils/logger.mjs'
+import cors from "@middy/http-cors";
+import middy from "@middy/core";
+import httpErrorHandler from "@middy/http-error-handler";
+import { createLogInfo } from '../../log-info/LogUtils.mjs'
+import { deleteTodoLogic } from "../../business-logic/todosLogic.js";
 
-const logger = createLogger('deleteToDo')
+const log = createLogInfo('Event: Delete todo!')
 
-export async function handler(event) {
-  const todoId = event.pathParameters.todoId
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Credentials': true
-  };
-  
-  try {
-    await deleteTodo(event, todoId);
-    logger.info(`Successfully deleted todo item: ${todoId}`);
-    return {
-      statusCode: 204,
-      headers,
-      body: undefined
-    };
-  } catch (error){
-    logger.error(`Error: ${error.message}`);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error })
-    };
-  }
-}
+export const handler = middy()
+    .use(httpErrorHandler())
+    .use(
+        cors({
+            credentials: true
+        })
+    )
+    .handler(async (ev) => {
+        console.log('Event: ', ev)
+        const todoId = await deleteTodoLogic(ev);
+        log.info('Deleted successfully!', {
+            todoId: todoId
+        })
+        return {
+            statusCode: 200,
+            body: 'Deleted successfully!'
+        }
+    })

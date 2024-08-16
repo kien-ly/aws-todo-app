@@ -1,4 +1,5 @@
-# Serverless TODO
+
+# Serverless TODO | UDACITY Cloud Developer project 4
 
 To implement this project you need to implement a simple TODO application using AWS Lambda and Serverless framework. Search for all the `TODO:` comments in the code to find the placeholders that you need to implement.
 
@@ -194,4 +195,3 @@ We can then use curl command to upload an image (`image.jpg` in this example) to
 ```sh
 curl -X PUT -T image.jpg -L "https://serverless-c4-todo-images.s3.us-east-1.amazonaws.com/...&x-id=PutObject"
 ```
-
